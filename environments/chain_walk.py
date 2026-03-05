@@ -6,12 +6,13 @@ class ChainWalkEnv(gym.Env):
     """
     Chain Walk Environment conforming to the Gymnasium API.
     """
-    def __init__(self, N=50, p=0.9):
+    def __init__(self, N=50, p=0.9, time_limit=500):
         super().__init__()
         
         self.N = N
         self.p = p
-        
+        self.time_limit = time_limit
+
         # States are 0 to N-1
         self.observation_space = spaces.Discrete(self.N)
         self.action_space = spaces.Discrete(2) # 0: Left, 1: Right
@@ -28,6 +29,8 @@ class ChainWalkEnv(gym.Env):
         
         self._build_mdp()
         self.state = None
+
+        self.counter = 0
 
     def _build_mdp(self):
         for s in range(self.N):
@@ -53,9 +56,11 @@ class ChainWalkEnv(gym.Env):
         super().reset(seed=seed)
         # Uniform initial distribution over the states
         self.state = self.np_random.integers(0, self.N)
+        self.counter = 0
         return self.state, {}
 
     def step(self, action):
+        self.counter += 1
         probs = self.P[self.state, action]
         next_state = self.np_random.choice(self.n_states, p=probs)
         
@@ -63,7 +68,7 @@ class ChainWalkEnv(gym.Env):
         
         self.state = next_state
         terminated = False # The chain can be traversed indefinitely
-        truncated = False
+        truncated = (self.counter >= self.time_limit) # Truncate after a certain number of steps to prevent infinite episodes
         
         return self.state, reward, terminated, truncated, {}
 
