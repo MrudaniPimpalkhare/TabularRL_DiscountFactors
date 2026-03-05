@@ -27,14 +27,17 @@ class LinearFA(BaseFA):
         r = r.flatten()
         f_k = f_k.flatten()
 
+        # Add a tiny numerical slack to prevent floating-point infeasibility
+        epsilon = 1e-4
+
         # Constraint 1: f >= f_k 
         # (This ensures monotonic reliability under FA)
-        constraint_1 = f >= f_k
+        constraint_1 = f >= f_k - epsilon
 
         # Constraint 2: T_mu(f) >= f  =>  (I - gamma * P_mu) @ f <= r
         I = np.eye(self.SA)
         bellman_matrix = I - gamma * P_mu
-        constraint_2 = bellman_matrix @ f <= r
+        constraint_2 = bellman_matrix @ f <= r + epsilon
 
         constraints = [constraint_1, constraint_2]
 

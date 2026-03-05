@@ -7,7 +7,7 @@ class OptimalStoppingEnv(gym.Env):
     Optimal Stopping Environment conforming to the Gymnasium API.
     Designed for use with tabular and FA-based Policy Iteration methods.
     """
-    def __init__(self, N=100, cost=0.1, p_up=0.4, p_down=0.4):
+    def __init__(self, N=100, cost=0.1, p_up=0.4, p_down=0.6):
         super().__init__()
         
         self.N = N 
@@ -22,12 +22,21 @@ class OptimalStoppingEnv(gym.Env):
         
         self.P = np.zeros((self.n_states, self.n_actions, self.n_states))
         self.R = np.zeros((self.n_states, self.n_actions))
+
+        self.R[:, 1] = 0.0 
+        
+        # 2. Create a sparse "spike" only at the very top of the chain
+        self.R[self.N - 1, 1] = 100.0 
+        self.R[self.N - 2, 1] = 50.0 
+        
+        # 3. Small continuation cost to encourage moving, but not so high that it forces immediate stopping
+        self.R[:, 0] = -self.cost
         
         for s in range(self.N):
             self.P[s, 1, self.terminal_state] = 1.0
-            self.R[s, 1] = s 
+            # self.R[s, 1] = s
             
-            self.R[s, 0] = -self.cost
+            # self.R[s, 0] = -self.cost
             
             if s == 0:
                 self.P[s, 0, 0] = 1.0 - p_up
