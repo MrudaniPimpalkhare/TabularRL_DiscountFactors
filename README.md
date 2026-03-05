@@ -8,4 +8,4 @@
 
 ## Setup 
 
-1. ```pip install numpy scipy cvxpy scikit-learn```
+1. ```pip install numpy scipy cvxpy scikit-learn ecos```

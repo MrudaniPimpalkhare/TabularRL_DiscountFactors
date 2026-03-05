@@ -1,5 +1,5 @@
 import numpy as np
-from rpi import RPI
+from .rpi import RPI
 
 class CRPI(RPI):
     """
@@ -9,16 +9,24 @@ class CRPI(RPI):
     def __init__(self, env, fa_model, gamma=0.9, max_iters=100):
         super().__init__(env, fa_model, gamma, max_iters)
         # Uniform initial distribution nu over SA space 
-        self.nu = np.ones((self.SA, 1)) / self.SA 
+        # self.nu = np.ones((self.SA, 1)) / self.SA - Moved to RPI for shared metric tracking
 
-    def train(self):
+    def train(self, track_metrics=True):
         r_flat = self.R_env.flatten().reshape(-1, 1)
+        history = {'true_return': [], 'est_return': []}
+        I = np.eye(self.SA)
         
         for k in range(self.max_iters):
             P_mu = self.get_P_mu(self.mu)
             
             # 1. Policy Evaluation (Same as RPI) [cite: 132, 133]
             self.f_k = self.fa_model.evaluate_policy(P_mu, r_flat, self.gamma, self.f_k) # this is f_k+1 in the paper
+
+            # Native Metric Tracking
+            if track_metrics:
+                Q_true = np.linalg.inv(I - self.gamma * P_mu) @ r_flat
+                history['true_return'].append((self.nu.T @ Q_true).item())
+                history['est_return'].append((self.nu.T @ self.f_k).item())
             
             # 2. Find the Greedy Policy (mu_bar) [cite: 138]
             Q = self.f_k.reshape(self.S, self.A)
@@ -34,7 +42,7 @@ class CRPI(RPI):
             a_mu_bar = (P_bar_mu - P_mu) @ self.f_k
             
             # b) Discounted state-action occupancy: d_mu^T = (1-gamma) * nu^T * (I - gamma * P_mu)^-1 
-            I = np.eye(self.SA)
+            # I = np.eye(self.SA)
             inv_matrix = np.linalg.inv(I - self.gamma * P_mu)
             d_mu_T = (1 - self.gamma) * self.nu.T @ inv_matrix
             
@@ -82,4 +90,4 @@ class CRPI(RPI):
             
             print(f"CRPI Iteration {k+1}/{self.max_iters} | alpha_k = {alpha_k:.4f}")
             
-        return self.mu, self.f_k
+        return self.mu, self.f_k, history
