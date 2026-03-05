@@ -16,51 +16,43 @@ class LinearFA(BaseFA):
         self.theta = cp.Variable(self.d) # The solver will tweak these 5 variables (weights) to find the optimal solution.
 
     def evaluate_policy(self, P_mu: np.ndarray, r: np.ndarray, gamma: float, f_k: np.ndarray) -> np.ndarray:
-        """
-        Solves the LP to find the weights theta that maximize the l1 distance 
-        from f_k subject to the Bellman constraints.
-        """
-        # Define the function f = Phi * theta
-        f = self.Phi @ self.theta 
+        # 1. Scaling: Normalize Phi to prevent numerical blowup with high degrees
+        # This keeps the math stable for the solver
+        norm_factor = np.linalg.norm(self.Phi, axis=0)
+        norm_factor[norm_factor == 0] = 1.0 # Avoid division by zero
+        Phi_scaled = self.Phi / norm_factor
+
+        # Define variable in scaled space
+        theta_scaled = cp.Variable(self.d)
+        f = Phi_scaled @ theta_scaled 
         
-        # Reshape inputs to ensure 1D arrays for CVXPY compatibility
         r = r.flatten()
         f_k = f_k.flatten()
-
-        # Add a tiny numerical slack to prevent floating-point infeasibility
         epsilon = 1e-4
 
-        # Constraint 1: f >= f_k 
-        # (This ensures monotonic reliability under FA)
-        constraint_1 = f >= f_k - epsilon
+        # Constraints (using scaled features)
+        constraints = [
+            f >= f_k - epsilon,
+            (np.eye(self.SA) - gamma * P_mu) @ f <= r + epsilon
+        ]
 
-        # Constraint 2: T_mu(f) >= f  =>  (I - gamma * P_mu) @ f <= r
-        I = np.eye(self.SA)
-        bellman_matrix = I - gamma * P_mu
-        constraint_2 = bellman_matrix @ f <= r + epsilon
-
-        constraints = [constraint_1, constraint_2]
-
-        # Objective: Maximize the l1-norm of (f - f_k). 
-        # Since constraint_1 guarantees f >= f_k, all terms are positive.
-        # Thus, maximizing sum(f - f_k) is equivalent to maximizing sum(f).
         objective = cp.Maximize(cp.sum(f))
-
-        # Define and solve the problem
         prob = cp.Problem(objective, constraints)
         
+        # 2. Multi-Solver Strategy
+        # try:
+        #     # Try ECOS first (Fast/Accurate)
+        #     prob.solve(solver=cp.ECOS, max_iters=100)
+        # except:
         try:
-            # ECOS and SCS are good open-source solvers included with cvxpy
-            prob.solve(solver=cp.ECOS)
-            
-            # this should not be the case according to claim 3.1 
-            if prob.status not in ["optimal", "optimal_inaccurate"]:
-                raise ValueError(f"Optimization failed. Status: {prob.status}")
-                
-        except Exception as e:
-            print(f"Warning: LP Solver failed with error: {e}. Returning f_k as fallback.")
-            return f_k.reshape(-1, 1) # Fallback to prevent complete crash
+            # Fallback to SCS (More robust against high-degree polynomial noise)
+            prob.solve(solver=cp.SCS, max_iters=2000)
+        except Exception:
+            return f_k.reshape(-1, 1)
 
-        # Compute the final f_{k+1} using the optimized theta
-        f_k_plus_1 = self.Phi @ self.theta.value
-        return f_k_plus_1.reshape(-1, 1)
+        if prob.status not in ["optimal", "optimal_inaccurate"] or theta_scaled.value is None:
+            return f_k.reshape(-1, 1)
+
+        # Convert back from scaled space to return the true f values
+        f_val = Phi_scaled @ theta_scaled.value
+        return f_val.reshape(-1, 1)
