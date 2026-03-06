@@ -3,7 +3,7 @@ import cvxpy as cp
 from .base_fa import BaseFA
 
 class LinearFA(BaseFA):
-    def __init__(self, Phi: np.ndarray):
+    def __init__(self, Phi: np.ndarray):    
         """
         Linear Function Approximation.
         
