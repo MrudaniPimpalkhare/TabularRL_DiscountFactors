@@ -1,4 +1,5 @@
 import numpy as np
+from tqdm import tqdm
 from .rpi import RPI
 
 class CRPI(RPI):
@@ -11,12 +12,13 @@ class CRPI(RPI):
         # Uniform initial distribution nu over SA space 
         # self.nu = np.ones((self.SA, 1)) / self.SA - Moved to RPI for shared metric tracking
 
-    def train(self, track_metrics=True):
+    def train(self, track_metrics=True, verbose=False):
         r_flat = self.R_env.flatten().reshape(-1, 1)
         history = {'true_return': [], 'est_return': []}
         I = np.eye(self.SA)
         
-        for k in range(self.max_iters):
+        iterator = tqdm(range(self.max_iters), desc="CRPI")
+        for k in iterator:
             P_mu = self.get_P_mu(self.mu)
             
             # 1. Policy Evaluation (Same as RPI) [cite: 132, 133]
@@ -88,6 +90,7 @@ class CRPI(RPI):
             alpha_k = min(1.0, max(0.0, alpha_star)) # clip between 0 and 1
             self.mu = alpha_k * bar_mu + (1 - alpha_k) * self.mu
             
-            print(f"CRPI Iteration {k+1}/{self.max_iters} | alpha_k = {alpha_k:.4f}")
+            if verbose:
+                iterator.set_postfix(alpha_k=f"{alpha_k:.4f}")
             
         return self.mu, self.f_k, history

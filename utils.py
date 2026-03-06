@@ -1,10 +1,31 @@
-# filepath: /home/sans/TabularRL_DiscountFactors/utils.py
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import os
+from datetime import datetime
 from IPython.display import display
 from algorithms.rpi import RPI
 from algorithms.crpi import CRPI
+
+
+# Default folder for saving plots
+PLOTS_DIR = "plots"
+
+
+def _ensure_plots_dir(subdir=None):
+    """Create plots directory if it doesn't exist and return the path."""
+    base_dir = PLOTS_DIR
+    if subdir:
+        save_dir = os.path.join(base_dir, subdir)
+    else:
+        save_dir = base_dir
+    os.makedirs(save_dir, exist_ok=True)
+    return save_dir
+
+
+def _sanitize_filename(name):
+    """Sanitize a string to be used as a filename."""
+    return "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in name).strip().replace(' ', '_')
 
 
 def solve_tabular_pi(env, gamma=0.9, max_iters=100):
@@ -43,7 +64,7 @@ def solve_tabular_pi(env, gamma=0.9, max_iters=100):
 
 
 def run_experiment(env, fa_class, gamma=0.9, iters=50, n_seeds=10, 
-                   fa_params=None, title_suffix="", verbose=True):
+                   fa_params=None, title_suffix="", verbose=True, save_plots=True):
     """
     Run RPI and CRPI experiments with the given function approximation class.
     
@@ -57,6 +78,7 @@ def run_experiment(env, fa_class, gamma=0.9, iters=50, n_seeds=10,
                    (e.g., {'n_states': 10, 'n_actions': 2, 'd_features': 4})
         title_suffix: String to append to plot titles (e.g., "Linear FA" or "Poly Degree 3")
         verbose: Whether to print progress messages
+        save_plots: Whether to automatically save plots to the plots directory
         
     Returns:
         dict: Results containing metrics and history
@@ -144,6 +166,17 @@ def run_experiment(env, fa_class, gamma=0.9, iters=50, n_seeds=10,
     ax2.grid(alpha=0.3)
     
     plt.tight_layout()
+    
+    # Save plot
+    if save_plots:
+        save_dir = _ensure_plots_dir(_sanitize_filename(title_suffix) if title_suffix else None)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        plot_filename = f"RPI_vs_CRPI_{_sanitize_filename(title_suffix)}_{timestamp}.png"
+        plot_path = os.path.join(save_dir, plot_filename)
+        plt.savefig(plot_path, dpi=150, bbox_inches='tight')
+        if verbose:
+            print(f"Plot saved to: {plot_path}")
+    
     plt.show()
     
     # --- Metrics Table ---
@@ -175,7 +208,7 @@ def run_experiment(env, fa_class, gamma=0.9, iters=50, n_seeds=10,
 
 
 def run_polynomial_sweep(env, poly_fa_class, degrees, gamma=0.9, iters=50, 
-                         n_seeds=5, base_fa_params=None, verbose=True):
+                         n_seeds=5, base_fa_params=None, verbose=True, save_plots=True):
     """
     Run experiments across multiple polynomial degrees.
     
@@ -188,6 +221,7 @@ def run_polynomial_sweep(env, poly_fa_class, degrees, gamma=0.9, iters=50,
         n_seeds: Number of random seeds per degree
         base_fa_params: Dict of base params for PolynomialFA (n_states, n_actions, d_features)
         verbose: Whether to print progress
+        save_plots: Whether to automatically save plots to the plots directory
         
     Returns:
         dict: Summary results across all degrees
@@ -280,6 +314,17 @@ def run_polynomial_sweep(env, poly_fa_class, degrees, gamma=0.9, iters=50,
         ax2.grid(alpha=0.3)
         
         plt.tight_layout()
+        
+        # Save plot
+        if save_plots:
+            save_dir = _ensure_plots_dir("polynomial_sweep")
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            plot_filename = f"Polynomial_Degree_{deg}_{timestamp}.png"
+            plot_path = os.path.join(save_dir, plot_filename)
+            plt.savefig(plot_path, dpi=150, bbox_inches='tight')
+            if verbose:
+                print(f"Plot saved to: {plot_path}")
+        
         plt.show()
         
         # Metrics table for this degree
