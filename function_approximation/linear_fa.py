@@ -3,34 +3,28 @@ import cvxpy as cp
 from .base_fa import BaseFA
 
 class LinearFA(BaseFA):
-    def __init__(self, Phi: np.ndarray):    
-        """
-        Linear Function Approximation.
-        
-        Args:
-            Phi (np.ndarray): The feature matrix of shape (SA, d). SA = number of state-action pairs, d = number of features.
-        """
+    def __init__(self, n_states: int, n_actions: int, d_features: int):    
+        self.d_features = d_features
+        self.SA = n_states * n_actions
+        Phi = np.random.uniform(1, 5, size=(self.SA, self.d_features))
+        Phi[:, 0] = 1.0 # Bias column
         self.Phi = Phi
-        self.SA, self.d = Phi.shape
-        # theta is the weight vector we are trying to optimize
-        self.theta = cp.Variable(self.d) # The solver will tweak these 5 variables (weights) to find the optimal solution.
+        # FIXED: self.d changed to self.d_features
+        self.theta = cp.Variable(self.d_features) 
 
     def evaluate_policy(self, P_mu: np.ndarray, r: np.ndarray, gamma: float, f_k: np.ndarray) -> np.ndarray:
-        # 1. Scaling: Normalize Phi to prevent numerical blowup with high degrees
-        # This keeps the math stable for the solver
         norm_factor = np.linalg.norm(self.Phi, axis=0)
-        norm_factor[norm_factor == 0] = 1.0 # Avoid division by zero
+        norm_factor[norm_factor == 0] = 1.0 
         Phi_scaled = self.Phi / norm_factor
 
-        # Define variable in scaled space
-        theta_scaled = cp.Variable(self.d)
+        # FIXED: self.d changed to self.d_features
+        theta_scaled = cp.Variable(self.d_features)
         f = Phi_scaled @ theta_scaled 
         
         r = r.flatten()
         f_k = f_k.flatten()
         epsilon = 1e-4
 
-        # Constraints (using scaled features)
         constraints = [
             f >= f_k - epsilon,
             (np.eye(self.SA) - gamma * P_mu) @ f <= r + epsilon
@@ -39,13 +33,7 @@ class LinearFA(BaseFA):
         objective = cp.Maximize(cp.sum(f))
         prob = cp.Problem(objective, constraints)
         
-        # 2. Multi-Solver Strategy
-        # try:
-        #     # Try ECOS first (Fast/Accurate)
-        #     prob.solve(solver=cp.ECOS, max_iters=100)
-        # except:
         try:
-            # Fallback to SCS (More robust against high-degree polynomial noise)
             prob.solve(solver=cp.SCS, max_iters=2000)
         except Exception:
             return f_k.reshape(-1, 1)
@@ -53,6 +41,5 @@ class LinearFA(BaseFA):
         if prob.status not in ["optimal", "optimal_inaccurate"] or theta_scaled.value is None:
             return f_k.reshape(-1, 1)
 
-        # Convert back from scaled space to return the true f values
         f_val = Phi_scaled @ theta_scaled.value
         return f_val.reshape(-1, 1)
