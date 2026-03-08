@@ -50,7 +50,7 @@ class ChainWalkEnv(gym.Env):
             for a in [0, 1]:
                 prob_enter_t1 = self.P[s, a, self.target_1]
                 prob_enter_t2 = self.P[s, a, self.target_2]
-                self.R[s, a] = prob_enter_t1 + prob_enter_t2
+                self.R[s, a] = (prob_enter_t1 + prob_enter_t2)
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -63,8 +63,9 @@ class ChainWalkEnv(gym.Env):
         self.counter += 1
         probs = self.P[self.state, action]
         next_state = self.np_random.choice(self.n_states, p=probs)
-        
-        reward = 1.0 if next_state in [self.target_1, self.target_2] else 0.0
+
+        # Get reward for the current state-action pair
+        reward = self.R[self.state, action]
         
         self.state = next_state
         terminated = False # The chain can be traversed indefinitely

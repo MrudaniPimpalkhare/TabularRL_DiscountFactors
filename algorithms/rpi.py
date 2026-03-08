@@ -1,4 +1,5 @@
 import numpy as np
+from tqdm import tqdm
 
 class RPI:
     """
@@ -36,12 +37,13 @@ class RPI:
                 P_mu[:, s_prime * self.A + a_prime] = P_flat[:, s_prime] * mu[s_prime, a_prime]
         return P_mu
 
-    def train(self, track_metrics=True):
+    def train(self, track_metrics=True, verbose=False):
         r_flat = self.R_env.flatten().reshape(-1, 1)
         history = {'true_return': [], 'est_return': []}
         I = np.eye(self.SA)
         
-        for k in range(self.max_iters):
+        iterator = tqdm(range(self.max_iters), desc="RPI")
+        for k in iterator:
             # 1. Build the SAxSA transition matrix for the current policy
             P_mu = self.get_P_mu(self.mu)
             
@@ -67,7 +69,5 @@ class RPI:
             new_mu[np.arange(self.S), best_actions] = 1.0
             
             self.mu = new_mu
-            
-            print(f"RPI Iteration {k+1}/{self.max_iters} completed.")
             
         return self.mu, self.f_k, history
