@@ -16,7 +16,7 @@ class CRPI(RPI):
         r_flat = self.R_env.flatten().reshape(-1, 1)
         history = {'true_return': [], 'est_return': []}
         I = np.eye(self.SA)
-        
+
         iterator = tqdm(range(self.max_iters), desc="CRPI")
         for k in iterator:
             P_mu = self.get_P_mu(self.mu)
@@ -85,9 +85,17 @@ class CRPI(RPI):
                     alpha_star = alpha_1_star
                 else:
                     alpha_star = alpha_0_star
+
+            #print(f"Iteration {k}: A_mu_bar={A_mu_bar:.4f}, eta_1={eta_1:.4f}, eta_2={eta_2:.4f}, partial={partial:.4f}, alpha_star={alpha_star:.4f}")
                     
             # 3. Policy Update (Conservative Mixture) [cite: 140, 141]
             alpha_k = min(1.0, max(0.0, alpha_star)) # clip between 0 and 1
+
+            if alpha_k < 1e-8:
+                policies_differ = not np.allclose(bar_mu, self.mu, atol=1e-10)
+                if policies_differ:
+                    alpha_k = 1.0 # fall back to greedy
+
             self.mu = alpha_k * bar_mu + (1 - alpha_k) * self.mu
             
             if verbose:

@@ -26,17 +26,17 @@ class OptimalStoppingEnv(gym.Env):
         self.R[:, 1] = 0.0 
         
         # 2. Create a sparse "spike" only at the very top of the chain
-        self.R[self.N - 1, 1] = 100.0 
-        self.R[self.N - 2, 1] = 50.0 
+        # self.R[self.N - 1, 1] = 500.0 
+        # self.R[self.N - 2, 1] = 250.0 
         
         # 3. Small continuation cost to encourage moving, but not so high that it forces immediate stopping
         self.R[:, 0] = -self.cost
         
         for s in range(self.N):
             self.P[s, 1, self.terminal_state] = 1.0
-            # self.R[s, 1] = s
+            self.R[s, 1] = s
             
-            # self.R[s, 0] = -self.cost
+            self.R[s, 0] = -self.cost
             
             if s == 0:
                 self.P[s, 0, 0] = 1.0 - p_up
